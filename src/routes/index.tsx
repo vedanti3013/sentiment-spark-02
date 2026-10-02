@@ -22,10 +22,14 @@ export const Route = createFileRoute("/")({
 });
 
 const examples = [
-  { label: "Negative · नकारात्मक", review: "उत्पाद की quality बहुत खराब है और delivery भी late हुई।", tone: "negative" },
-  { label: "Neutral · तटस्थ", review: "Product ठीक है, जैसा बताया गया था वैसा ही मिला।", tone: "neutral" },
-  { label: "Positive · सकारात्मक", review: "बहुत शानदार experience! Quality और service दोनों कमाल हैं।", tone: "positive" },
+  { label: "Negative · नकारात्मक", review: "उत्पाद की गुणवत्ता बहुत ख़राब है और डिलीवरी भी देर से हुई।", tone: "negative" },
+  { label: "Neutral · तटस्थ", review: "उत्पाद ठीक है, जैसा बताया गया था वैसा ही मिला।", tone: "neutral" },
+  { label: "Positive · सकारात्मक", review: "बहुत शानदार अनुभव! गुणवत्ता और सेवा दोनों कमाल हैं।", tone: "positive" },
 ] as const;
+
+// Input is Hindi-only: at least one Devanagari letter, no Latin letters.
+const HINDI_RE = /[\u0900-\u097F]/;
+const LATIN_RE = /[A-Za-z]/;
 
 const models = [
   ["SVM", "92.4%"],
@@ -39,9 +43,17 @@ function Index() {
   const [title, setTitle] = useState("");
   const [model, setModel] = useState("SVM");
   const [status, setStatus] = useState<"empty" | "loading" | "result" | "error">("empty");
+  const [errorText, setErrorText] = useState("");
 
   const analyze = () => {
-    if (!review.trim()) {
+    const text = review.trim();
+    if (!text) {
+      setErrorText("कृपया review लिखें — input empty है.");
+      setStatus("error");
+      return;
+    }
+    if (!HINDI_RE.test(text) || LATIN_RE.test(text)) {
+      setErrorText("केवल Hindi (देवनागरी) input accepted है — कृपया English अक्षर हटाकर दोबारा लिखें.");
       setStatus("error");
       return;
     }
@@ -52,6 +64,7 @@ function Index() {
   const clear = () => {
     setReview("");
     setTitle("");
+    setErrorText("");
     setStatus("empty");
   };
 
