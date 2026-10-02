@@ -22,10 +22,14 @@ export const Route = createFileRoute("/")({
 });
 
 const examples = [
-  { label: "Negative · नकारात्मक", review: "उत्पाद की quality बहुत खराब है और delivery भी late हुई।", tone: "negative" },
-  { label: "Neutral · तटस्थ", review: "Product ठीक है, जैसा बताया गया था वैसा ही मिला।", tone: "neutral" },
-  { label: "Positive · सकारात्मक", review: "बहुत शानदार experience! Quality और service दोनों कमाल हैं।", tone: "positive" },
+  { label: "Negative · नकारात्मक", review: "उत्पाद की गुणवत्ता बहुत ख़राब है और डिलीवरी भी देर से हुई।", tone: "negative" },
+  { label: "Neutral · तटस्थ", review: "उत्पाद ठीक है, जैसा बताया गया था वैसा ही मिला।", tone: "neutral" },
+  { label: "Positive · सकारात्मक", review: "बहुत शानदार अनुभव! गुणवत्ता और सेवा दोनों कमाल हैं।", tone: "positive" },
 ] as const;
+
+// Input is Hindi-only: at least one Devanagari letter, no Latin letters.
+const HINDI_RE = /[\u0900-\u097F]/;
+const LATIN_RE = /[A-Za-z]/;
 
 const models = [
   ["SVM", "92.4%"],
@@ -39,9 +43,17 @@ function Index() {
   const [title, setTitle] = useState("");
   const [model, setModel] = useState("SVM");
   const [status, setStatus] = useState<"empty" | "loading" | "result" | "error">("empty");
+  const [errorText, setErrorText] = useState("");
 
   const analyze = () => {
-    if (!review.trim()) {
+    const text = review.trim();
+    if (!text) {
+      setErrorText("कृपया review लिखें — input empty है.");
+      setStatus("error");
+      return;
+    }
+    if (!HINDI_RE.test(text) || LATIN_RE.test(text)) {
+      setErrorText("केवल Hindi (देवनागरी) input accepted है — कृपया English अक्षर हटाकर दोबारा लिखें.");
       setStatus("error");
       return;
     }
@@ -52,6 +64,7 @@ function Index() {
   const clear = () => {
     setReview("");
     setTitle("");
+    setErrorText("");
     setStatus("empty");
   };
 
@@ -85,11 +98,11 @@ function Index() {
               <label className="block"><span className="mb-1.5 block text-sm font-bold">Title · शीर्षक <span className="font-normal text-muted-foreground">(optional)</span></span><input value={title} onChange={(event) => setTitle(event.target.value)} className="h-11 w-full rounded-md border-2 border-foreground bg-background px-3 outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring" placeholder="Review का छोटा title" /></label>
             </div>
 
-            <label className="mt-5 block"><span className="mb-1.5 block text-sm font-bold">Review · समीक्षा</span><textarea value={review} onChange={(event) => setReview(event.target.value.slice(0, 1000))} maxLength={1000} className="min-h-44 w-full resize-none rounded-md border-2 border-foreground bg-background p-4 text-base leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring" placeholder="अपनी Hindi review यहाँ लिखें… product या service कैसी लगी?" /><span className="mt-1 block text-right text-xs font-bold text-muted-foreground">{review.length} / 1,000 characters</span></label>
+            <label className="mt-5 block"><span className="mb-1.5 block text-sm font-bold">Review · समीक्षा <span className="font-normal text-muted-foreground">(केवल Hindi · देवनागरी)</span></span><textarea value={review} onChange={(event) => setReview(event.target.value.slice(0, 1000))} maxLength={1000} lang="hi" className="min-h-44 w-full resize-none rounded-md border-2 border-foreground bg-background p-4 text-base leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring" placeholder="अपनी review यहाँ देवनागरी में लिखें… product या service कैसी लगी?" /><span className="mt-1 block text-right text-xs font-bold text-muted-foreground">{review.length} / 1,000 characters</span></label>
 
             <div className="mt-4"><p className="mb-2 text-sm font-bold">Try an example · उदाहरण</p><div className="flex gap-2 overflow-x-auto pb-2">{examples.map((example) => <Button key={example.tone} variant="secondary" onClick={() => { setReview(example.review); setStatus("empty"); }} className={`h-9 shrink-0 px-3 text-xs ${example.tone === "negative" ? "text-negative" : example.tone === "neutral" ? "text-neutral" : "text-positive"}`}>{example.tone === "negative" ? <TrendingDown className="size-4" /> : example.tone === "neutral" ? <MinusCircle className="size-4" /> : <CheckCircle2 className="size-4" />}{example.label}</Button>)}</div></div>
 
-            {status === "error" && <div role="alert" className="mt-3 flex items-center gap-2 rounded-md border-2 border-negative bg-negative/10 px-3 py-2 text-sm font-semibold text-negative"><AlertCircle className="size-5 shrink-0" />कृपया review लिखें — input empty है.</div>}
+            {status === "error" && <div role="alert" className="mt-3 flex items-center gap-2 rounded-md border-2 border-negative bg-negative/10 px-3 py-2 text-sm font-semibold text-negative"><AlertCircle className="size-5 shrink-0" />{errorText}</div>}
 
             <div className="mt-5 flex gap-3"><Button onClick={analyze} disabled={status === "loading"} className="min-w-32">{status === "loading" && <span className="size-4 animate-spin-fast rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />} {status === "loading" ? "Analyzing…" : "Analyze"}</Button><Button variant="secondary" onClick={clear}>Clear</Button></div>
           </section>
