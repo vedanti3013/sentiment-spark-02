@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Keep shared interactive controls in `src/components/ui`; this preserves consistent behavior and visual variants across routes.
+- Keep navigation and model selection shared across analysis routes; this prevents labels, accuracy values, and active states from drifting.
