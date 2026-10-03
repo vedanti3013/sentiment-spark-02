@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertCircle, CheckCircle2, ChevronDown, MinusCircle, TrendingDown } from "lucide-react";
+import { AlertCircle, CheckCircle2, MinusCircle, TrendingDown } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AppHeader } from "@/components/ui/app-header";
+import { ModelSelect } from "@/components/ui/model-select";
 
 // No head() here: the home route inherits title/description/og/twitter from
 // __root.tsx, and ships no og:image so serve-time hosting can inject the
@@ -30,13 +32,6 @@ const examples = [
 // Input is Hindi-only: at least one Devanagari letter, no Latin letters.
 const HINDI_RE = /[\u0900-\u097F]/;
 const LATIN_RE = /[A-Za-z]/;
-
-const models = [
-  ["SVM", "92.4%"],
-  ["Logistic Regression", "89.1%"],
-  ["Naive Bayes", "86.7%"],
-  ["Decision Tree", "83.2%"],
-] as const;
 
 function Index() {
   const [review, setReview] = useState("");
@@ -70,20 +65,7 @@ function Index() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b-2 border-foreground bg-card">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-10">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-accent font-display text-xl text-accent-foreground shadow-[3px_3px_0_var(--ink)]">भा</div>
-            <div><div className="font-display text-xl leading-none">भावSense</div><div className="mt-1 text-xs font-semibold text-muted-foreground">Hindi Sentiment Lab</div></div>
-          </div>
-          <nav aria-label="Primary" className="grid grid-cols-4 gap-1 overflow-x-auto rounded-md border-2 border-foreground bg-secondary p-1 text-center text-xs font-bold sm:text-sm">
-            <span className="rounded-sm bg-primary px-3 py-2 text-primary-foreground">Analyze</span>
-            <span className="px-3 py-2 text-muted-foreground">Batch Upload</span>
-            <span className="px-3 py-2 text-muted-foreground">Model Performance</span>
-            <span className="px-3 py-2 text-muted-foreground">About</span>
-          </nav>
-        </div>
-      </header>
+      <AppHeader active="/" />
 
       <div className="mx-auto max-w-[1440px] px-4 py-7 md:px-10 md:py-10">
         <div className="mb-7 flex items-end justify-between gap-4 border-b-2 border-foreground pb-5">
@@ -94,7 +76,7 @@ function Index() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(360px,.88fr)]">
           <section className="border-2 border-foreground bg-card p-4 shadow-[6px_6px_0_var(--ink)] md:p-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block"><span className="mb-1.5 block text-sm font-bold">Model · मॉडल</span><div className="relative"><select value={model} onChange={(event) => setModel(event.target.value)} className="h-11 w-full appearance-none rounded-md border-2 border-foreground bg-background px-3 pr-9 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring">{models.map(([name, accuracy]) => <option key={name} value={name}>{name} — {accuracy} accuracy</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-3 size-5" /></div></label>
+              <ModelSelect value={model} onChange={setModel} />
               <label className="block"><span className="mb-1.5 block text-sm font-bold">Title · शीर्षक <span className="font-normal text-muted-foreground">(optional)</span></span><input value={title} onChange={(event) => setTitle(event.target.value)} className="h-11 w-full rounded-md border-2 border-foreground bg-background px-3 outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring" placeholder="Review का छोटा title" /></label>
             </div>
 
