@@ -1,8 +1,8 @@
 import { ChevronDown } from "lucide-react";
 
 export const classicalModels = [
-  ["SVM", "92.4%"],
-  ["Logistic Regression", "89.1%"],
+  ["SVM", "74.32%"],
+  ["Logistic Regression", "71.04%"],
 ] as const;
 
 export function ModelSelect({ value, onChange, id = "model" }: { value: string; onChange: (value: string) => void; id?: string }) {
