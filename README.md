@@ -37,21 +37,71 @@ npm i
 npm run dev
 ```
 
-### Run the sentiment backend
+### Run the project with the trained models (Windows)
 
-The frontend calls the FastAPI service at `http://127.0.0.1:8000` by default. Start it
-from the repository root in a second terminal:
+The backend loads the trained pipelines from `model_bundle/`:
 
-```sh
-python -m pip install fastapi uvicorn joblib pandas openpyxl python-multipart
-python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+- `svm.joblib`
+- `logistic_regression.joblib`
+- `naive_bayes.joblib`
+- `decision_tree.joblib`
+
+The frontend dropdown intentionally exposes SVM and Logistic Regression. Predictions,
+confidence, and class probabilities are returned directly by the selected trained
+pipeline; they are not hardcoded in the frontend.
+
+#### First-time setup
+
+Open PowerShell in the repository root:
+
+```powershell
+cd C:\Users\MANISHA\Desktop\amazon-hindi-sentiment
+py -3.13 -m pip install fastapi uvicorn joblib pandas openpyxl python-multipart
+npm install
 ```
+
+Python 3.13 is required in this workspace because it has the installed backend and
+scikit-learn dependencies. The default Python 3.14 installation does not have `uvicorn`.
+
+#### Every time you run the project
+
+1. Open PowerShell terminal 1 and start the backend:
+
+   ```powershell
+   cd C:\Users\MANISHA\Desktop\amazon-hindi-sentiment
+   py -3.13 -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+
+2. Leave terminal 1 running. In PowerShell terminal 2, start the frontend:
+
+   ```powershell
+   cd C:\Users\MANISHA\Desktop\amazon-hindi-sentiment
+   npm run dev -- --host 127.0.0.1
+   ```
+
+3. Open the URL printed by Vite. In this workspace it is usually:
+   `http://127.0.0.1:8080/`
+
+4. Confirm the backend is running before analyzing:
+
+   ```powershell
+   Invoke-RestMethod http://127.0.0.1:8000/
+   ```
+
+   The response should say `Hindi Sentiment Analysis API is running`.
+
+5. To stop either service, press `Ctrl+C` in its terminal.
+
+#### Backend API endpoints
+
+- `GET http://127.0.0.1:8000/` — health check
+- `GET http://127.0.0.1:8000/api/models` — model names and metrics
+- `POST http://127.0.0.1:8000/api/predict` — single-review prediction
+- `POST http://127.0.0.1:8000/api/batch` — CSV/XLSX batch prediction
 
 To use a different backend URL, set `VITE_API_URL` before starting the frontend:
 
-```sh
-VITE_API_URL=http://127.0.0.1:8000 npm run dev
+```powershell
+$env:VITE_API_URL="http://127.0.0.1:8000"
+npm run dev -- --host 127.0.0.1
 ```
-
-In PowerShell, use `$env:VITE_API_URL="http://127.0.0.1:8000"` before
-`npm run dev`.
