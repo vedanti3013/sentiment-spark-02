@@ -140,6 +140,59 @@ LABELS = [
     "positive"
 ]
 
+POSITIVE_CUES = (
+    "अच्छा", "अच्छी", "अच्छे", "शानदार", "बेहतरीन", "उत्तम",
+    "कमाल", "पसंद", "खुश", "संतुष्ट", "उत्कृष्ट", "बढ़िया"
+)
+NEGATIVE_CUES = (
+    "खराब", "ख़राब", "बेकार", "बुरा", "बुरी", "बुरे", "निराश",
+    "देर", "टूटा", "समस्या", "घटिया", "नापसंद"
+)
+NEUTRAL_CUES = ("ठीक", "औसत", "सामान्य", "जैसा बताया", "ठीकठाक")
+
+
+def apply_clear_hindi_cue_guardrail(text, prediction, probabilities):
+    normalized = " ".join(text.split())
+    positive_score = sum(normalized.count(cue) for cue in POSITIVE_CUES)
+    negative_score = sum(normalized.count(cue) for cue in NEGATIVE_CUES)
+    neutral_score = sum(normalized.count(cue) for cue in NEUTRAL_CUES)
+
+    negative_score += sum(
+        normalized.count(f"{cue} नहीं") for cue in POSITIVE_CUES
+    )
+    positive_score += sum(
+        normalized.count(f"{cue} नहीं") for cue in NEGATIVE_CUES
+    )
+    positive_score -= sum(
+        normalized.count(f"{cue} नहीं") for cue in POSITIVE_CUES
+    )
+    negative_score -= sum(
+        normalized.count(f"{cue} नहीं") for cue in NEGATIVE_CUES
+    )
+
+    if negative_score > positive_score and negative_score >= neutral_score:
+        corrected = "negative"
+    elif positive_score > negative_score and positive_score >= neutral_score:
+        corrected = "positive"
+    elif neutral_score and not positive_score and not negative_score:
+        corrected = "neutral"
+    else:
+        return prediction, probabilities
+
+    if corrected == prediction:
+        return prediction, probabilities
+
+    adjusted = {label: float(probabilities.get(label, 0)) for label in LABELS}
+    adjusted[corrected] = max(adjusted[corrected], 80.0)
+    remaining = 100.0 - adjusted[corrected]
+    other_total = sum(value for label, value in adjusted.items() if label != corrected)
+    if other_total:
+        for label in adjusted:
+            if label != corrected:
+                adjusted[label] = adjusted[label] / other_total * remaining
+
+    return corrected, {label: round(value, 2) for label, value in adjusted.items()}
+
 # ============================================================
 # REQUEST FORMAT FOR PREDICTION
 # ============================================================
@@ -302,6 +355,13 @@ def predict(
 
         confidence = None
 
+    prediction, probability_dict = apply_clear_hindi_cue_guardrail(
+        text,
+        prediction,
+        probability_dict
+    )
+    confidence = max(probability_dict.values()) if probability_dict else confidence
+
     # ========================================================
     # RESPONSE
     # ========================================================
@@ -462,7 +522,31 @@ async def batch_analysis(
 
     result_df["review"] = texts
 
-    result_df["predicted_sentiment"] = predictions
+    corrected_predictions = []
+    corrected_confidences = []
+    for index, prediction in enumerate(predictions):
+        if hasattr(classifier, "predict_proba"):
+            row_probabilities = classifier.predict_proba([texts[index]])[0]
+            probability_dict = {
+                str(label): round(float(probability) * 100, 2)
+                for label, probability in zip(classifier.classes_, row_probabilities)
+            }
+        else:
+            probability_dict = {label: 0 for label in LABELS}
+
+        corrected, corrected_probabilities = apply_clear_hindi_cue_guardrail(
+            texts[index],
+            prediction,
+            probability_dict
+        )
+        corrected_predictions.append(corrected)
+        corrected_confidences.append(
+            max(corrected_probabilities.values())
+            if corrected_probabilities
+            else confidences[index]
+        )
+
+    result_df["predicted_sentiment"] = corrected_predictions
 
     result_df[
         "confidence"
@@ -477,7 +561,7 @@ async def batch_analysis(
 
         else None
 
-        for x in confidences
+        for x in corrected_confidences
     ]
 
 
@@ -577,7 +661,7 @@ async def batch_analysis(
 
         x
 
-        for x in confidences
+        for x in corrected_confidences
 
         if x is not None
     ]

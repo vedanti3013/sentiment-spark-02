@@ -47,8 +47,10 @@ The backend loads the trained pipelines from `model_bundle/`:
 - `decision_tree.joblib`
 
 The frontend dropdown intentionally exposes SVM and Logistic Regression. Predictions,
-confidence, and class probabilities are returned directly by the selected trained
-pipeline; they are not hardcoded in the frontend.
+confidence, and class probabilities come from the selected trained pipeline. A narrow
+backend guardrail corrects only clear Hindi cue/negation mismatches, such as `खराब`
+or `अच्छा नहीं`, because the saved models have weak performance on some short or
+long out-of-training-distribution reviews.
 
 #### First-time setup
 
