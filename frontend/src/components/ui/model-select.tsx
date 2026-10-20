@@ -6,8 +6,6 @@ const API_BASE = "http://127.0.0.1:8000";
 const fallbackModels = [
   ["SVM", "74.32%"],
   ["Logistic Regression", "71.04%"],
-  ["Naive Bayes", "67.76%"],
-  ["Decision Tree", "61.20%"],
 ] as const;
 
 export function ModelSelect({ value, onChange, id = "model" }: { value: string; onChange: (value: string) => void; id?: string }) {
@@ -24,6 +22,7 @@ export function ModelSelect({ value, onChange, id = "model" }: { value: string; 
         const data: { models: Array<{ name: string; accuracy: number | null }> } =
           await response.json();
         const apiModels = data.models
+          .filter((model) => model.name === "SVM" || model.name === "Logistic Regression")
           .filter((model) => typeof model.accuracy === "number")
           .map((model) => [model.name, `${(model.accuracy * 100).toFixed(2)}%`] as const);
 

@@ -36,3 +36,22 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+### Run the sentiment backend
+
+The frontend calls the FastAPI service at `http://127.0.0.1:8000` by default. Start it
+from the repository root in a second terminal:
+
+```sh
+python -m pip install fastapi uvicorn joblib pandas openpyxl python-multipart
+python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+To use a different backend URL, set `VITE_API_URL` before starting the frontend:
+
+```sh
+VITE_API_URL=http://127.0.0.1:8000 npm run dev
+```
+
+In PowerShell, use `$env:VITE_API_URL="http://127.0.0.1:8000"` before
+`npm run dev`.

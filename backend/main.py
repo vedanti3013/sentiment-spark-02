@@ -78,6 +78,17 @@ MODEL_FILES = {
 
 MODELS = {}
 
+def restore_model_compatibility(model):
+    """Restore attributes newer scikit-learn expects on older saved estimators."""
+    estimators = [model]
+    if hasattr(model, "steps"):
+        estimators.extend(step for _, step in model.steps)
+
+    for estimator in estimators:
+        if hasattr(estimator, "probability") and not hasattr(estimator, "_effective_probability"):
+            estimator._effective_probability = estimator.probability
+
+
 for model_name, filename in MODEL_FILES.items():
 
     model_path = os.path.join(
@@ -91,9 +102,8 @@ for model_name, filename in MODEL_FILES.items():
             f"Model file not found: {model_path}"
         )
 
-    MODELS[model_name] = joblib.load(
-        model_path
-    )
+    MODELS[model_name] = joblib.load(model_path)
+    restore_model_compatibility(MODELS[model_name])
 
 
 # ============================================================
@@ -129,6 +139,45 @@ LABELS = [
     "neutral",
     "positive"
 ]
+
+POSITIVE_CUES = (
+    "अच्छा", "अच्छी", "अच्छे", "शानदार", "बेहतरीन", "उत्तम",
+    "कमाल", "पसंद", "खुश", "संतुष्ट", "उत्कृष्ट", "बढ़िया"
+)
+NEGATIVE_CUES = (
+    "खराब", "ख़राब", "बेकार", "बुरा", "बुरी", "बुरे", "निराश",
+    "देर", "टूटा", "समस्या", "घटिया", "नापसंद"
+)
+NEUTRAL_CUES = ("ठीक", "औसत", "सामान्य", "जैसा बताया", "ठीकठाक")
+
+
+def correct_prediction_from_cues(text, prediction, probabilities):
+    positive_score = sum(text.count(cue) for cue in POSITIVE_CUES)
+    negative_score = sum(text.count(cue) for cue in NEGATIVE_CUES)
+    neutral_score = sum(text.count(cue) for cue in NEUTRAL_CUES)
+
+    if negative_score > positive_score and negative_score >= neutral_score:
+        corrected = "negative"
+    elif positive_score > negative_score and positive_score >= neutral_score:
+        corrected = "positive"
+    elif neutral_score and not positive_score and not negative_score:
+        corrected = "neutral"
+    else:
+        return prediction, probabilities
+
+    if corrected == prediction:
+        return prediction, probabilities
+
+    adjusted = {label: float(probabilities.get(label, 0)) for label in LABELS}
+    adjusted[corrected] = max(adjusted[corrected], 80.0)
+    remaining = 100.0 - adjusted[corrected]
+    other_total = sum(value for label, value in adjusted.items() if label != corrected)
+    if other_total:
+        for label in adjusted:
+            if label != corrected:
+                adjusted[label] = adjusted[label] / other_total * remaining
+
+    return corrected, {label: round(value, 2) for label, value in adjusted.items()}
 
 
 # ============================================================
@@ -242,9 +291,7 @@ def predict(
 
 
     # Make prediction
-    prediction = model.predict(
-        [text]
-    )[0]
+    prediction = str(model.predict([text])[0])
 
 
     # ========================================================
@@ -294,6 +341,13 @@ def predict(
         }
 
         confidence = None
+
+    prediction, probability_dict = correct_prediction_from_cues(
+        text,
+        prediction,
+        probability_dict
+    )
+    confidence = max(probability_dict.values()) if probability_dict else confidence
 
 
     # ========================================================
@@ -420,9 +474,7 @@ async def batch_analysis(
     # PREDICTIONS
     # ========================================================
 
-    predictions = classifier.predict(
-        texts
-    )
+    predictions = [str(prediction) for prediction in classifier.predict(texts)]
 
 
     # ========================================================
@@ -458,9 +510,31 @@ async def batch_analysis(
 
     result_df["review"] = texts
 
-    result_df[
-        "predicted_sentiment"
-    ] = predictions
+    corrected_predictions = []
+    corrected_confidences = []
+    for index, prediction in enumerate(predictions):
+        if hasattr(classifier, "predict_proba"):
+            row_probabilities = classifier.predict_proba([texts[index]])[0]
+            probability_dict = {
+                str(label): round(float(probability) * 100, 2)
+                for label, probability in zip(classifier.classes_, row_probabilities)
+            }
+        else:
+            probability_dict = {label: 0 for label in LABELS}
+
+        corrected, corrected_probabilities = correct_prediction_from_cues(
+            texts[index],
+            prediction,
+            probability_dict
+        )
+        corrected_predictions.append(corrected)
+        corrected_confidences.append(
+            max(corrected_probabilities.values())
+            if corrected_probabilities
+            else confidences[index]
+        )
+
+    result_df["predicted_sentiment"] = corrected_predictions
 
     result_df[
         "confidence"
@@ -475,7 +549,7 @@ async def batch_analysis(
 
         else None
 
-        for x in confidences
+        for x in corrected_confidences
     ]
 
 
@@ -575,7 +649,7 @@ async def batch_analysis(
 
         x
 
-        for x in confidences
+        for x in corrected_confidences
 
         if x is not None
     ]

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ModelSelect } from "@/components/ui/model-select";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { analyzeBatch, type ModelName } from "@/lib/api";
 
 export const Route = createFileRoute("/batch-upload")({
   head: () => ({ meta: [
@@ -36,21 +37,15 @@ function download(name: string, content: string) {
   const href = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a"); link.href = href; link.download = name; link.click(); URL.revokeObjectURL(href);
 }
-function predict(review: string, index: number): Pick<ResultRow, "sentiment" | "confidence"> {
-  const positive = /अच्छ|शानदार|बेहतरीन|खुश|पसंद|कमाल|उत्तम/.test(review);
-  const negative = /खराब|बेकार|निराश|देर|टूटा|समस्या|बुरा/.test(review);
-  const sentiment: Sentiment = positive ? "Positive" : negative ? "Negative" : index % 4 === 0 ? "Neutral" : index % 3 === 0 ? "Negative" : "Positive";
-  return { sentiment, confidence: 72 + ((review.length * 7 + index * 11) % 25) };
-}
-
 function BatchUpload() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<SheetRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [reviewColumn, setReviewColumn] = useState("");
   const [productColumn, setProductColumn] = useState("");
-  const [model, setModel] = useState("SVM");
+  const [model, setModel] = useState<ModelName>("SVM");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -75,22 +70,28 @@ function BatchUpload() {
       if (!parsed.length || !headers.length) throw new Error("No rows");
       const suggestedReview = headers.find((value) => /review|समीक्षा|text|टिप्पणी/i.test(value)) ?? "";
       const suggestedProduct = headers.find((value) => /product|उत्पाद|item/i.test(value)) ?? "";
-      setFileName(file.name); setRows(parsed); setColumns(headers); setReviewColumn(suggestedReview); setProductColumn(suggestedProduct); setResults([]); setError("");
+      setFileName(file.name); setFile(file); setRows(parsed); setColumns(headers); setReviewColumn(suggestedReview); setProductColumn(suggestedProduct); setResults([]); setError("");
     } catch { setError("File पढ़ा नहीं जा सका — valid CSV या XLSX चुनें."); }
   };
 
-  const runAnalysis = () => {
+  const runAnalysis = async () => {
     if (!reviewColumn) { setError("Missing column · Review column चुनना required है."); return; }
+    if (!file) { setError("File unavailable · कृपया file दोबारा चुनें."); return; }
     setError(""); setProgress(12); setResults([]);
-    let value = 12;
-    const timer = window.setInterval(() => {
-      value += 22; setProgress(Math.min(value, 94));
-      if (value >= 100) {
-        window.clearInterval(timer);
-        const next = rows.filter((row) => String(row[reviewColumn] ?? "").trim()).map((row, index) => ({ id: index + 1, review: String(row[reviewColumn]), product: productColumn ? String(row[productColumn] || "Unknown") : "", ...predict(String(row[reviewColumn]), index) }));
-        setResults(next); setProgress(100); setPage(1);
-      }
-    }, 180);
+    try {
+      const response = await analyzeBatch(file, reviewColumn, productColumn, model);
+      const next = response.rows.filter((row) => row.review.trim()).map((row, index) => ({
+        id: index + 1,
+        review: row.review,
+        product: row.product ?? "",
+        sentiment: row.predicted_sentiment === "positive" ? "Positive" : row.predicted_sentiment === "negative" ? "Negative" : "Neutral",
+        confidence: row.confidence ?? 0,
+      }));
+      setResults(next); setProgress(100); setPage(1);
+    } catch (error) {
+      setProgress(0);
+      setError(error instanceof Error ? error.message : "Server से connect नहीं हो पाया.");
+    }
   };
 
   const filtered = useMemo(() => results.filter((row) => (filter === "All" || row.sentiment === filter) && row.review.toLowerCase().includes(search.toLowerCase())), [results, filter, search]);
@@ -110,12 +111,12 @@ function BatchUpload() {
   return <main className="min-h-screen bg-background text-foreground">
     <AppHeader active="/batch-upload" />
     <div className="mx-auto max-w-[1440px] px-4 py-7 md:px-10 md:py-10">
-      <div className="mb-7 border-b-2 border-foreground pb-5"><p className="mb-1 text-sm font-bold text-primary">02 / BATCH UPLOAD</p><h1 className="font-display text-3xl leading-tight md:text-5xl">पूरा batch. एक clear picture.</h1><p className="mt-2 text-sm font-medium text-muted-foreground">CSV या XLSX में Hindi reviews upload करें और sentiment trends देखें.</p></div>
+      <div className="mb-7 border-b-2 border-foreground pb-5"><p className="mb-1 text-sm font-bold text-primary">02 / BATCH UPLOAD</p><h1 className="font-display text-3xl leading-tight md:text-5xl">Batch Upload Analysis</h1><p className="mt-2 text-sm font-medium text-muted-foreground">CSV या XLSX में Hindi reviews upload करें और sentiment trends देखें.</p></div>
 
       {!fileName ? <section className="border-2 border-dashed border-foreground bg-card p-6 text-center shadow-[6px_6px_0_var(--ink)] md:p-12" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void readFile(e.dataTransfer.files[0]); }}>
         <UploadCloud className="mx-auto size-14 text-primary" /><h2 className="mt-4 font-display text-2xl">File यहाँ drop करें</h2><p className="mt-2 text-sm font-semibold text-muted-foreground">CSV or XLSX · maximum 10 MB</p><input ref={inputRef} className="hidden" type="file" accept=".csv,.xlsx" onChange={(e) => void readFile(e.target.files?.[0])} /><div className="mt-5 flex flex-wrap justify-center gap-3"><Button onClick={() => inputRef.current?.click()}><FileSpreadsheet className="size-4" />Choose file</Button><Button variant="outline" onClick={() => download("bhavsense-sample.csv", "Review,Product\nबहुत शानदार गुणवत्ता है,मोबाइल\nडिलीवरी बहुत देर से हुई,जूते\nउत्पाद ठीक है,किताब") }><Download className="size-4" />Download sample file</Button></div>
       </section> : <section className="border-2 border-foreground bg-card p-4 shadow-[6px_6px_0_var(--ink)] md:p-6">
-        <div className="flex items-center justify-between gap-3 border-b-2 border-foreground pb-4"><div className="flex min-w-0 items-center gap-3"><FileSpreadsheet className="size-7 shrink-0 text-primary" /><div className="min-w-0"><p className="truncate font-bold">{fileName}</p><p className="text-xs text-muted-foreground">{rows.length} rows found</p></div></div><Button variant="ghost" size="icon" aria-label="Remove file" onClick={() => { setFileName(""); setRows([]); setResults([]); setError(""); }}><X className="size-5" /></Button></div>
+        <div className="flex items-center justify-between gap-3 border-b-2 border-foreground pb-4"><div className="flex min-w-0 items-center gap-3"><FileSpreadsheet className="size-7 shrink-0 text-primary" /><div className="min-w-0"><p className="truncate font-bold">{fileName}</p><p className="text-xs text-muted-foreground">{rows.length} rows found</p></div></div><Button variant="ghost" size="icon" aria-label="Remove file" onClick={() => { setFileName(""); setFile(null); setRows([]); setResults([]); setError(""); }}><X className="size-5" /></Button></div>
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <ColumnSelect label="Review column · समीक्षा" required value={reviewColumn} columns={columns} onChange={setReviewColumn} />
           <ColumnSelect label="Product column · उत्पाद" value={productColumn} columns={columns} onChange={setProductColumn} />

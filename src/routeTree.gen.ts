@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BatchUploadRouteImport } from './routes/batch-upload'
-import { Route as ModelPerformanceRouteImport } from './routes/model-performance'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,40 +22,31 @@ const BatchUploadRoute = BatchUploadRouteImport.update({
   path: '/batch-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ModelPerformanceRoute = ModelPerformanceRouteImport.update({
-  id: '/model-performance',
-  path: '/model-performance',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/batch-upload': typeof BatchUploadRoute
-  '/model-performance': typeof ModelPerformanceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/batch-upload': typeof BatchUploadRoute
-  '/model-performance': typeof ModelPerformanceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/batch-upload': typeof BatchUploadRoute
-  '/model-performance': typeof ModelPerformanceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/batch-upload' | '/model-performance'
+  fullPaths: '/' | '/batch-upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/batch-upload' | '/model-performance'
-  id: '__root__' | '/' | '/batch-upload' | '/model-performance'
+  to: '/' | '/batch-upload'
+  id: '__root__' | '/' | '/batch-upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BatchUploadRoute: typeof BatchUploadRoute
-  ModelPerformanceRoute: typeof ModelPerformanceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,20 +65,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BatchUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/model-performance': {
-      id: '/model-performance'
-      path: '/model-performance'
-      fullPath: '/model-performance'
-      preLoaderRoute: typeof ModelPerformanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BatchUploadRoute: BatchUploadRoute,
-  ModelPerformanceRoute: ModelPerformanceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

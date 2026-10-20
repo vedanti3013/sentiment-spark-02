@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Analyze Hindi Reviews — भावSense" },
-      { name: "description", content: "Analyze Hindi reviews using SVM, Logistic Regression, Naive Bayes, or Decision Tree." },
+      { name: "description", content: "Analyze Hindi reviews using SVM or Logistic Regression." },
       { property: "og:title", content: "Analyze Hindi Reviews — भावSense" },
       { property: "og:description", content: "A vibrant Hindi–English sentiment analysis workspace." },
       { property: "og:type", content: "website" },
@@ -43,7 +43,7 @@ type Prediction = {
 function Index() {
   const [review, setReview] = useState("");
   const [title, setTitle] = useState("");
-  const [model, setModel] = useState("Naive Bayes");
+  const [model, setModel] = useState("SVM");
   const [status, setStatus] = useState<"empty" | "loading" | "result" | "error">("empty");
   const [errorText, setErrorText] = useState("");
   const [prediction, setPrediction] = useState<Prediction | null>(null);

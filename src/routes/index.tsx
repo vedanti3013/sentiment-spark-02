@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/ui/app-header";
 import { ModelSelect } from "@/components/ui/model-select";
+import { predictReview, type ModelName, type PredictionResponse } from "@/lib/api";
 
 // No head() here: the home route inherits title/description/og/twitter from
 // __root.tsx, and ships no og:image so serve-time hosting can inject the
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Analyze Hindi Reviews — भावSense" },
-      { name: "description", content: "Analyze Hindi reviews using SVM, Logistic Regression, Naive Bayes, or Decision Tree." },
+      { name: "description", content: "Analyze Hindi reviews using SVM or Logistic Regression." },
       { property: "og:title", content: "Analyze Hindi Reviews — भावSense" },
       { property: "og:description", content: "A vibrant Hindi–English sentiment analysis workspace." },
       { property: "og:type", content: "website" },
@@ -36,11 +37,12 @@ const LATIN_RE = /[A-Za-z]/;
 function Index() {
   const [review, setReview] = useState("");
   const [title, setTitle] = useState("");
-  const [model, setModel] = useState("SVM");
+  const [model, setModel] = useState<ModelName>("SVM");
   const [status, setStatus] = useState<"empty" | "loading" | "result" | "error">("empty");
   const [errorText, setErrorText] = useState("");
+  const [result, setResult] = useState<PredictionResponse | null>(null);
 
-  const analyze = () => {
+  const analyze = async () => {
     const text = review.trim();
     if (!text) {
       setErrorText("कृपया review लिखें — input empty है.");
@@ -53,13 +55,22 @@ function Index() {
       return;
     }
     setStatus("loading");
-    window.setTimeout(() => setStatus("result"), 800);
+    setErrorText("");
+    try {
+      const prediction = await predictReview(text, model);
+      setResult(prediction);
+      setStatus("result");
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : "Server से connect नहीं हो पाया.");
+      setStatus("error");
+    }
   };
 
   const clear = () => {
     setReview("");
     setTitle("");
     setErrorText("");
+    setResult(null);
     setStatus("empty");
   };
 
@@ -69,8 +80,8 @@ function Index() {
 
       <div className="mx-auto max-w-[1440px] px-4 py-7 md:px-10 md:py-10">
         <div className="mb-7 flex items-end justify-between gap-4 border-b-2 border-foreground pb-5">
-          <div><p className="mb-1 text-sm font-bold text-primary">01 / SINGLE REVIEW</p><h1 className="font-display text-3xl leading-tight md:text-5xl">Review पढ़ें. Mood समझें.</h1></div>
-          <p className="hidden max-w-xs text-right text-sm font-medium text-muted-foreground md:block">Hindi review को analyze करें और model confidence तुरंत देखें.</p>
+          <div><p className="mb-1 text-sm font-bold text-primary">01 / SINGLE REVIEW</p><h1 className="font-display text-3xl leading-tight md:text-5xl">Review Hindi Sentiment Analysis</h1></div>
+          <p className="hidden max-w-xs text-right text-sm font-medium text-muted-foreground md:block">Hindi review को analyze करें.</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(360px,.88fr)]">
@@ -89,23 +100,28 @@ function Index() {
             <div className="mt-5 flex gap-3"><Button onClick={analyze} disabled={status === "loading"} className="min-w-32">{status === "loading" && <span className="size-4 animate-spin-fast rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />} {status === "loading" ? "Analyzing…" : "Analyze"}</Button><Button variant="secondary" onClick={clear}>Clear</Button></div>
           </section>
 
-          <ResultPanel status={status} model={model} />
+          <ResultPanel status={status} model={model} result={result} />
         </div>
       </div>
     </main>
   );
 }
 
-function ResultPanel({ status, model }: { status: "empty" | "loading" | "result" | "error"; model: string }) {
+function ResultPanel({ status, model, result }: { status: "empty" | "loading" | "result" | "error"; model: string; result: PredictionResponse | null }) {
   if (status !== "result") {
     return <section className="flex min-h-80 flex-col items-center justify-center border-2 border-foreground bg-secondary p-8 text-center shadow-[6px_6px_0_var(--ink)]"><div className="mb-4 grid size-16 place-items-center rounded-full border-2 border-foreground bg-accent text-2xl font-bold">{status === "loading" ? <span className="size-7 animate-spin-fast rounded-full border-3 border-foreground/25 border-t-foreground" /> : "अ"}</div><h2 className="font-display text-2xl">{status === "loading" ? "भाव पढ़ रहे हैं…" : "Result यहाँ दिखेगा"}</h2><p className="mt-2 max-w-sm text-sm font-medium text-muted-foreground">{status === "loading" ? "Model review के शब्दों और tone को analyze कर रहा है." : "Review लिखकर Analyze दबाएँ. Confidence और सभी class probabilities यहीं मिलेंगी."}</p></section>;
   }
 
+  if (!result) return null;
   const bars = [
-    { label: "Negative · नकारात्मक", value: 7, color: "bg-negative", text: "text-negative", icon: <TrendingDown className="size-4" /> },
-    { label: "Neutral · तटस्थ", value: 11, color: "bg-neutral", text: "text-neutral", icon: <MinusCircle className="size-4" /> },
-    { label: "Positive · सकारात्मक", value: 82, color: "bg-positive", text: "text-positive", icon: <CheckCircle2 className="size-4" /> },
+    { label: "Negative · नकारात्मक", value: result.probabilities.negative ?? 0, color: "bg-negative", text: "text-negative", icon: <TrendingDown className="size-4" /> },
+    { label: "Neutral · तटस्थ", value: result.probabilities.neutral ?? 0, color: "bg-neutral", text: "text-neutral", icon: <MinusCircle className="size-4" /> },
+    { label: "Positive · सकारात्मक", value: result.probabilities.positive ?? 0, color: "bg-positive", text: "text-positive", icon: <CheckCircle2 className="size-4" /> },
   ];
+  const sentiment = result.prediction;
+  const sentimentLabel = sentiment === "positive" ? "Positive · सकारात्मक" : sentiment === "negative" ? "Negative · नकारात्मक" : "Neutral · तटस्थ";
+  const SentimentIcon = sentiment === "positive" ? CheckCircle2 : sentiment === "negative" ? TrendingDown : MinusCircle;
+  const sentimentColor = sentiment === "positive" ? "text-positive" : sentiment === "negative" ? "text-negative" : "text-neutral";
 
-  return <section className="border-2 border-foreground bg-card p-5 shadow-[6px_6px_0_var(--ink)] md:p-6"><p className="text-sm font-bold text-muted-foreground">02 / SENTIMENT RESULT</p><div className="mt-4 flex items-center gap-4 border-b-2 border-foreground pb-5"><div className="grid size-16 shrink-0 place-items-center rounded-md bg-positive/15 text-positive"><CheckCircle2 className="size-9" /></div><div><h2 className="font-display text-3xl text-positive">Positive · सकारात्मक</h2><p className="mt-1 text-sm font-semibold">Confidence <span className="text-xl text-foreground">82%</span></p></div></div><div className="mt-6 space-y-5">{bars.map((bar) => <div key={bar.label}><div className={`mb-1.5 flex items-center justify-between text-sm font-bold ${bar.text}`}><span className="flex items-center gap-2">{bar.icon}{bar.label}</span><span>{bar.value}%</span></div><div className="h-3 overflow-hidden border border-foreground/30 bg-muted"><div className={`h-full animate-bar-fill ${bar.color}`} style={{ width: `${bar.value}%` }} /></div></div>)}</div><div className="mt-6 flex items-center justify-between rounded-md border-2 border-foreground bg-secondary px-4 py-3 text-sm font-bold"><span>Predicted by</span><span>{model}</span></div></section>;
+  return <section className="border-2 border-foreground bg-card p-5 shadow-[6px_6px_0_var(--ink)] md:p-6"><p className="text-sm font-bold text-muted-foreground">02 / SENTIMENT RESULT</p><div className="mt-4 flex items-center gap-4 border-b-2 border-foreground pb-5"><div className={`grid size-16 shrink-0 place-items-center rounded-md bg-secondary ${sentimentColor}`}><SentimentIcon className="size-9" /></div><div><h2 className={`font-display text-3xl ${sentimentColor}`}>{sentimentLabel}</h2><p className="mt-1 text-sm font-semibold">Confidence <span className="text-xl text-foreground">{result.confidence ?? 0}%</span></p></div></div><div className="mt-6 space-y-5">{bars.map((bar) => <div key={bar.label}><div className={`mb-1.5 flex items-center justify-between text-sm font-bold ${bar.text}`}><span className="flex items-center gap-2">{bar.icon}{bar.label}</span><span>{bar.value}%</span></div><div className="h-3 overflow-hidden border border-foreground/30 bg-muted"><div className={`h-full animate-bar-fill ${bar.color}`} style={{ width: `${bar.value}%` }} /></div></div>)}</div><div className="mt-6 flex items-center justify-between rounded-md border-2 border-foreground bg-secondary px-4 py-3 text-sm font-bold"><span>Predicted by</span><span>{model}</span></div></section>;
 }

@@ -85,7 +85,7 @@ function BatchUpload() {
   const [columns, setColumns] = useState<string[]>([]);
   const [reviewColumn, setReviewColumn] = useState("");
   const [productColumn, setProductColumn] = useState("");
-  const [model, setModel] = useState("Naive Bayes");
+  const [model, setModel] = useState("SVM");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -186,7 +186,10 @@ const runAnalysis = async () => {
   return <main className="min-h-screen bg-background text-foreground">
     <AppHeader active="/batch-upload" />
     <div className="mx-auto max-w-[1440px] px-4 py-7 md:px-10 md:py-10">
-      <div className="mb-7 border-b-2 border-foreground pb-5"><p className="mb-1 text-sm font-bold text-primary">02 / BATCH UPLOAD</p><h1 className="font-display text-3xl leading-tight md:text-5xl">पूरा batch. एक clear picture.</h1><p className="mt-2 text-sm font-medium text-muted-foreground">CSV या XLSX में Hindi reviews upload करें और sentiment trends देखें.</p></div>
+      <div className="mb-7 border-b-2 border-foreground pb-5"><p className="mb-1 text-sm font-bold text-primary">02 / BATCH UPLOAD</p>
+      <h1 className="font-display text-3xl leading-tight md:text-5xl">Batch Upload Analysis</h1>
+      <p className="mt-2 text-sm font-medium text-muted-foreground">CSV या XLSX में Hindi reviews upload करें और sentiment trends देखें.</p>
+      </div>
 
       {!fileName ? <section className="border-2 border-dashed border-foreground bg-card p-6 text-center shadow-[6px_6px_0_var(--ink)] md:p-12" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void readFile(e.dataTransfer.files[0]); }}>
         <UploadCloud className="mx-auto size-14 text-primary" /><h2 className="mt-4 font-display text-2xl">File यहाँ drop करें</h2><p className="mt-2 text-sm font-semibold text-muted-foreground">CSV or XLSX · maximum 10 MB</p><input ref={inputRef} className="hidden" type="file" accept=".csv,.xlsx" onChange={(e) => void readFile(e.target.files?.[0])} /><div className="mt-5 flex flex-wrap justify-center gap-3"><Button onClick={() => inputRef.current?.click()}><FileSpreadsheet className="size-4" />Choose file</Button><Button variant="outline" onClick={() => download("bhavsense-sample.csv", "Review,Product\nबहुत शानदार गुणवत्ता है,मोबाइल\nडिलीवरी बहुत देर से हुई,जूते\nउत्पाद ठीक है,किताब") }><Download className="size-4" />Download sample file</Button></div>
